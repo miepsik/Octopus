@@ -46,14 +46,14 @@ class Agent:
 		self.__session = tf.Session()
 		self.__session.run(self.init)
 		
-		
+		self.__reward = 0
 		
 		if os.path.isfile(self.CKPT):
 			self.saver.restore(self.__session,self.CKPT)
 			
 	def __extractFeatureReward(self,*args):
 		"Reward"
-		return args[1]
+		return self.__reward
 			
 	def __extractFeatureCenterOfGravity(self,*args):
 		"Center of gravity (equal masses of points)"
@@ -119,6 +119,7 @@ class Agent:
 	def step(self, reward, state):
 		"Given current reward and state, agent returns next action"
 		self.__step += 1
+		self.__reward += reward
 		state = np.array(list(state)).reshape((1,self.__realStateDim))
 		
 		self.__getReward(state,reward)
