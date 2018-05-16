@@ -31,6 +31,7 @@ class Agent:
 		self.angle = np.arctan2(9,-1)
 		
 		#Set up neural network
+		os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 		tf.reset_default_graph()
 		self.input = tf.placeholder(shape=[1,self.__stateDim],dtype=tf.float32)
 		self.theta = tf.Variable(tf.random_uniform([self.__stateDim,2**self.__actionDim],0,0.01))
@@ -65,7 +66,7 @@ class Agent:
 	def __extractFeatureDistance(self,*args):
 		"Euklidean distance from closest to (9,-1)"
 		state = args[0]
-		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[:,:2]#lista punktów (x,y)(czubki segmentów macki)
+		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[:,:2]
 		xy-= [9,-1]
 		return np.sqrt(np.square(xy).sum(1).min())
 		
@@ -78,7 +79,7 @@ class Agent:
 	def __extractFeatureVertexCloser(self,*args):
 		"Which vertex of the tentacle is closer (-1 if lower, 1 if upper)"
 		state = args[0]
-		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[[9,19],:2]#lista punktów (x,y)(czubki segmentów macki)
+		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[[9,19],:2]
 		return np.argmin(np.square(xy - [9,-1]).sum(1))*2-1	
 		
 	def __getFeatureVector(self,state,reward):
