@@ -1,0 +1,36 @@
+SOURCE_FILES = \
+	protocol.c \
+	tcpClient.c \
+	template_agent.c
+
+HEADER_FILES = \
+	agent.h \
+	protocol.h
+
+OBJECT_FILES = $(SOURCE_FILES:.c=.o)
+
+CC = gcc
+EXECUTABLE = agent_handler
+
+# To get assembler listing: -Lasm=%n.lst
+CFLAGS = -c -Wall
+LDFLAGS = -lsocket -lnsl
+
+.SUFFIXES: .c .o
+
+all: $(EXECUTABLE)
+
+clean:
+	rm -f $(OBJECT_FILES) $(EXECUTABLE)
+
+# Here are the program dependencies
+
+$(EXECUTABLE): $(OBJECT_FILES)
+	$(CC) $(LDFLAGS) -o $@ $+
+
+$(OBJECT_FILES): $(HEADER_FILES)
+
+# Standard rules
+.c.o:
+	$(CC) $(CFLAGS) $<
+
