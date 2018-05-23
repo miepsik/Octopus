@@ -43,37 +43,11 @@ class Agent:
         self.g = 0.9
         self.e = 0.1
         self.__step = 0
-        self.CKPT = "../../tmp/model.ckpt"
         self.angle = np.arctan2(9, -1)
-
-        print(self.__stateDim)
-        inputShape = (self.__stateDim)
-        self.model = Sequential()
-        self.model.add(InputLayer(batch_input_shape=(1, 6 + 8 * 6)))
-        self.model.add(Dense(30, activation='sigmoid'))
-        self.model.add(Dense(20, activation='sigmoid'))
-        self.model.add(Dense(6 * 6 * 6, activation='linear'))
-        self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
-        # Set up neural network
-        tf.reset_default_graph()
-        self.input = tf.placeholder(shape=[1, self.__stateDim], dtype=tf.float32)
-        self.theta = tf.Variable(tf.random_uniform([self.__stateDim, 2 ** self.__actionDim], 0, 0.01))
-        self.Q = tf.matmul(self.input, self.theta)
-        self.bestQ = tf.argmax(self.Q, 1)
-
-        self.Qprime = tf.placeholder(shape=[1, 2 ** self.__actionDim], dtype=tf.float32)
-        self.loss = tf.reduce_sum(tf.square(self.Qprime - self.Q))
-        self.trainer = tf.train.GradientDescentOptimizer(learning_rate=self.alpha)
-        self.updateModel = self.trainer.minimize(self.loss)
-        self.init = tf.global_variables_initializer()
-        self.saver = tf.train.Saver()
-        self.__session = tf.Session()
-        self.__session.run(self.init)
+        self.model = keras.models.load_model('model')
 
         self.__reward = 0
 
-        if os.path.isfile(self.CKPT):
-            self.saver.restore(self.__session, self.CKPT)
 
     def __extractFeatureReward(self, *args):
         "Reward"
@@ -81,13 +55,13 @@ class Agent:
 
     def __extractFeatureCenterOfGravity(self, *args):
         "Center of gravity (equal masses of points)"
-        state = args[0]
+        state = args[0].copy()
         xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
         return np.sqrt(np.square(xy).sum(1)).mean()
 
     def __extractFeatureDistance(self, *args):
         "Euklidean distance from closest to (9,-1)"
-        state = args[0]
+        state = args[0].copy()
         xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:,
              :2]  # lista punktów (x,y)(czubki segmentów macki)
         xy -= [9, -1]
@@ -100,34 +74,43 @@ class Agent:
 
     def __extractFeatureAngleParallelity2(self, *args):
         state = args[0][0]
+        print(state)
         "Angle stopping tentacle from parallelity with [(0,0),(9,-1)]"
         return angleBetweenPoints(state[74:76], (9, -1), state[78:80])
 
     def __extractFeatureVertexCloser(self, *args):
         "Which vertex of the tentacle is closer (-1 if lower, 1 if upper)"
-        state = args[0]
+        state = args[0].copy()
         xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[[9, 19],
              :2]  # lista punktów (x,y)(czubki segmentów macki)
         return np.argmin(np.square(xy - [9, -1]).sum(1)) * 2 - 1
 
-    def __extractFeatureImportantPoints(self, *args):
+    def __extractImportantPoints(self, *args):
         state = args[0][0][2:]
         l = []
         for i in (0, 4, 5, 7, 8, 9):
-            l.append(state[4 * i:4 * i + 5])
-            l.append(state[4 * i + 40:4 * i + 45])
-        for i in range(0, len(l), 4):
-            l[i] -= 5
-            l[i + 1] -= 1
+            for j in range(4):
+                l.append(state[4*i+j])
+            for j in range(4):
+                l.append(state[4*i+40+j])
+        print(l)
+        for i in range(12):
+            l[i*4] -= 4.5
+            l[i*4+1] -= 1
         return l
 
-    def __getFeatureVector(self, state, reward):
+    def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
+        self.__reward += reward
+        st=state.copy()
+        state = np.array(list(state)).reshape((1, self.__realStateDim))
         f = []
         for m in self.featureExtractors:
+            s=state.copy()
             # print(m.__name__,m(state,reward))
-            f += [m(state, reward)]
-        return np.array(f).reshape((1, self.__stateDim))
+            f += [m(s, reward)]
+        f+=self.__extractImportantPoints(st)
+        return f
 
     def __getActionAndItsPrediction(self, state):
         "Choose an action by greedily (with e chance of random action) from the Q-network"
@@ -150,9 +133,11 @@ class Agent:
     def start(self, state):
         "Given starting state, agent returns first action"
         self.__step += 1
+        l=[]
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-        state = self.__getFeatureVector(state, 0)
-        self.__action = self.__getActionAndItsPrediction(state)
+        l.append(self.getFeatureVector(state, 0))
+        print(len(state))
+        self.__action = self.__decodeAction(np.argmax(self.model.predict(np.array(l))))
         return self.__action
 
     def step(self, reward, state):
@@ -160,26 +145,14 @@ class Agent:
         self.__step += 1
         self.__reward += reward
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-
+        l=[]
         self.__getReward(state, reward)
-        state = self.__getFeatureVector(state, reward)
+        l.append(self.getFeatureVector(state, reward))
+        target = self.model.predict(np.array(l))
 
-        Q = self.__session.run(self.Q, feed_dict={self.input: state})
-        maxQ = np.max(Q)
-        targetQ = self.__predictedAllQ
-        targetQ[0, self.__actionEncoded] = self.__reward + self.g * maxQ
-        # Train our network using target and predicted Q values
-        _, W1 = self.__session.run([self.updateModel, self.theta],
-                                   feed_dict={self.input: self.__lastState, self.Qprime: targetQ})
-
-        self.__action = self.__getActionAndItsPrediction(state)
+        self.__action = self.__decodeAction(np.argmax(target))
 
         # Reduce chance of random action as we train the model.
-        self.e = 1. / (self.__step / 1000 + 10)
-
-        if self.__step % 1001 == 0 or reward == 10:
-            self.saver.save(self.__session, self.CKPT)
-
         return self.__action
 
     def end(self, reward):
@@ -195,13 +168,13 @@ class Agent:
         x = []
         for i in range(3):
             y = a % 6
-            x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [0, 0, 1], 4: [1, 1, 0], 5: [0, 1, 1]}[y]
+            for j in range((5, 4, 1)[i]):
+                x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [0, 0, 1], 4: [1, 1, 0], 5: [0, 1, 1]}[y]
             a //= 6
         return x
 
     def __destruct(self):
         print("Ala ma kota")
-        self.__session.close()
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.__destruct()
