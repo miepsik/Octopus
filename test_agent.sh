@@ -1,4 +1,5 @@
 #!/bin/bash
+export LC_ALL=C.UTF-8
 
 PORT=64398
 PYTHON=python # Modify to you needs
@@ -35,8 +36,8 @@ for instance in $TESTDIR/*.xml; do
     test=`basename ${instance%.*}`
     printf "%-12s" "$test "
 
-    # Run the server
-    java -Duser.language=en -Duser.region=EN -Djava.endorsed.dirs=environment/lib -jar environment/octopus-environment.jar external_gui $instance $PORT &
+    # Run the server -Djava.endorsed.dirs=environment/lib 
+    java -Duser.language=en -Duser.region=EN -jar environment/octopus-environment.jar external_gui $instance $PORT &
     server_pid=$! 
 
     # run the agent
@@ -49,23 +50,17 @@ for instance in $TESTDIR/*.xml; do
     done
     popd >/dev/null
     sleep $SLEEP_TIME # Waste of time
-	
-	echo 'Ala ma kota'
 
     # Kill the server
-    kill $server_pid
-    sleep $SLEEP_TIME # Waste of time, but I need to wait for OS to reclaim the port
+    kill -9 $server_pid
 	
-	echo 'Ala ma kota'
+    sleep $SLEEP_TIME # Waste of time, but I need to wait for OS to reclaim the port
 	
     # Move the results to results/agent/*.log and print the sum of rewards
     logfile=`ls *.log`
     printf "%6.2f\n" `cat "$logfile" | meansum`
 	mv $logfile $RESDIR/${test}.log
-	
-	
-	echo 'Ala ma kota'
-	
+		
 done
 
 # Average reward over all tests
