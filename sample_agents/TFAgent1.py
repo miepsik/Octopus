@@ -44,10 +44,9 @@ class Agent:
         self.e = 0.1
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model')
+        self.model = keras.models.load_model('model2')
 
         self.__reward = 0
-
 
     def __extractFeatureReward(self, *args):
         "Reward"
@@ -90,26 +89,26 @@ class Agent:
         l = []
         for i in (0, 4, 5, 7, 8, 9):
             for j in range(4):
-                l.append(state[4*i+j])
+                l.append(state[4 * i + j])
             for j in range(4):
-                l.append(state[4*i+40+j])
+                l.append(state[4 * i + 40 + j])
         print(l)
         for i in range(12):
-            l[i*4] -= 4.5
-            l[i*4+1] -= 1
+            l[i * 4] -= 4.5
+            l[i * 4 + 1] -= 1
         return l
 
     def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
         self.__reward += reward
-        st=state.copy()
+        st = state.copy()
         state = np.array(list(state)).reshape((1, self.__realStateDim))
         f = []
         for m in self.featureExtractors:
-            s=state.copy()
+            s = state.copy()
             # print(m.__name__,m(state,reward))
             f += [m(s, reward)]
-        f+=self.__extractImportantPoints(st)
+        f += self.__extractImportantPoints(st)
         return f
 
     def __getActionAndItsPrediction(self, state):
@@ -132,20 +131,14 @@ class Agent:
 
     def start(self, state):
         "Given starting state, agent returns first action"
-        self.__step += 1
-        l=[]
-        state = np.array(list(state)).reshape((1, self.__realStateDim))
-        l.append(self.getFeatureVector(state, 0))
-        print(len(state))
-        self.__action = self.__decodeAction(np.argmax(self.model.predict(np.array(l))))
-        return self.__action
+        return self.step(0, state)
 
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
         self.__step += 1
         self.__reward += reward
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-        l=[]
+        l = []
         self.__getReward(state, reward)
         l.append(self.getFeatureVector(state, reward))
         target = self.model.predict(np.array(l))
