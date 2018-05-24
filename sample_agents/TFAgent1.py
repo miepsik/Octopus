@@ -69,13 +69,12 @@ class Agent:
     def __extractFeatureAngleParallelity(self, *args):
         state = args[0][0]
         "Angle stopping tentacle from parallelity with [(0,0),(9,-1)]"
-        return angleBetweenPoints(state[34:36], (9, -1), state[38:40])
+        return angleBetweenPoints((9, -1), state[34:36], state[38:40])
 
     def __extractFeatureAngleParallelity2(self, *args):
         state = args[0][0]
-        print(state)
         "Angle stopping tentacle from parallelity with [(0,0),(9,-1)]"
-        return angleBetweenPoints(state[74:76], (9, -1), state[78:80])
+        return angleBetweenPoints((9, -1), state[74:76], state[78:80])
 
     def __extractFeatureVertexCloser(self, *args):
         "Which vertex of the tentacle is closer (-1 if lower, 1 if upper)"
@@ -92,7 +91,6 @@ class Agent:
                 l.append(state[4 * i + j])
             for j in range(4):
                 l.append(state[4 * i + 40 + j])
-        print(l)
         for i in range(12):
             l[i * 4] -= 4.5
             l[i * 4 + 1] -= 1
@@ -127,7 +125,9 @@ class Agent:
 
     def __getReward(self, state, reward):
         "distance from point + reward"
-        self.__reward = 1 - self.__extractFeatureDistance(state) / 9.05538 + reward
+        self.__reward = 8 - self.__extractFeatureDistance(state) / 9.05538 + reward - \
+                        abs(self.__extractFeatureAngleParallelity(state)) - \
+                        abs(self.__extractFeatureAngleParallelity2(state))
 
     def start(self, state):
         "Given starting state, agent returns first action"
