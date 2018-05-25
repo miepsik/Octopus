@@ -42,7 +42,7 @@ class Agent:
         # Set up control variables
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.1
+        self.e = 0.0005
         self.__step = 0
         self.angle = np.arctan2(9, -1)
         self.model = keras.models.load_model('model3')
@@ -50,6 +50,7 @@ class Agent:
         self.__reward = 0
         self.previousStep = np.array([])
         self.previousValues = np.array([])
+        self.previousAction = 0
 
     def __extractFeatureReward(self, *args):
         "Reward"
@@ -148,14 +149,16 @@ class Agent:
         best = np.argmax(values)
         if self.__step > 1:
             newReward = reward + self.alpha*np.max(values)
-            self.previousValues[0][best] = newReward
+            print(newReward)
+            self.previousValues[0][self.previousAction] = newReward
             self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
         self.previousStep = l
         self.previousValues = np.array(values)
         if random.random() > self.e:
-            self.__action = self.__decodeAction(best)
+            self.previousAction = best
         else:
-            self.__action = self.__decodeAction(random.randint(0, 6*6*6))
+            self.previousAction = random.randint(0, 6*6*6)
+        self.__action = self.__decodeAction(self.previousAction)
         self.e *= self.g
         if self.__step%1001 == 0 or reward==10:
             print("hello")
