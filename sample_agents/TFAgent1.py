@@ -6,6 +6,7 @@ import keras
 from keras.models import Sequential
 from keras.layers import Dense, InputLayer
 import math
+import random
 
 import os
 
@@ -39,14 +40,16 @@ class Agent:
         self.__action = np.zeros(actionDim)
 
         # Set up control variables
-        self.alpha = 0.1
-        self.g = 0.9
+        self.alpha = 0.9
+        self.g = 0.99
         self.e = 0.1
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model2')
+        self.model = keras.models.load_model('model3')
 
         self.__reward = 0
+        self.previousStep = np.array([])
+        self.previousValues = np.array([])
 
     def __extractFeatureReward(self, *args):
         "Reward"
@@ -138,20 +141,34 @@ class Agent:
         self.__step += 1
         self.__reward += reward
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-        l = []
-        self.__getReward(state, reward)
-        l.append(self.getFeatureVector(state, reward))
-        target = self.model.predict(np.array(l))
-
-        self.__action = self.__decodeAction(np.argmax(target))
-
+        # self.__getReward(state, reward)
+        state = self.getFeatureVector(state, reward)
+        l = np.array([state])
+        values = self.model.predict(np.array(l))
+        best = np.argmax(values)
+        if self.__step > 1:
+            newReward = reward + self.alpha*np.max(values)
+            self.previousValues[0][best] = newReward
+            self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
+        self.previousStep = l
+        self.previousValues = np.array(values)
+        if random.random() > self.e:
+            self.__action = self.__decodeAction(best)
+        else:
+            self.__action = self.__decodeAction(random.randint(0, 6*6*6))
+        self.e *= self.g
+        if self.__step%1001 == 0 or reward==10:
+            print("hello")
+            self.model.save("model3")
         # Reduce chance of random action as we train the model.
         return self.__action
 
     def end(self, reward):
+        print("DONE")
         pass
 
     def cleanup(self):
+        print("DONE1")
         pass
 
     def getName(self):
