@@ -42,25 +42,27 @@ class Agent:
         # Set up control variables
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.0005
+        self.e = 0.5
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model3')
+        self.model = keras.models.load_model('model22')
 
         self.__reward = 0
         self.previousStep = np.array([])
         self.previousValues = np.array([])
         self.previousAction = 0
 
-    def __extractFeatureReward(self, *args):
-        "Reward"
-        return self.__reward
+        self.up = True
 
-    def __extractFeatureCenterOfGravity(self, *args):
-        "Center of gravity (equal masses of points)"
-        state = args[0].copy()
-        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
-        return np.sqrt(np.square(xy).sum(1)).mean()
+    # def __extractFeatureReward(self, *args):
+    #     "Reward"
+    #     return self.__reward
+    #
+    # def __extractFeatureCenterOfGravity(self, *args):
+    #     "Center of gravity (equal masses of points)"
+    #     state = args[0].copy()
+    #     xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
+    #     return np.sqrt(np.square(xy).sum(1)).mean()
 
     def __extractFeatureDistance(self, *args):
         "Euklidean distance from closest to (9,-1)"
@@ -90,12 +92,12 @@ class Agent:
     def __extractImportantPoints(self, *args):
         state = args[0][0][2:]
         l = []
-        for i in (0, 4, 5, 7, 8, 9):
+        for i in (0, 4, 7):
             for j in range(4):
                 l.append(state[4 * i + j])
             for j in range(4):
                 l.append(state[4 * i + 40 + j])
-        for i in range(12):
+        for i in range(6):
             l[i * 4] -= 4.5
             l[i * 4 + 1] -= 1
         return l
@@ -129,7 +131,7 @@ class Agent:
 
     def __getReward(self, state, reward):
         "distance from point + reward"
-        self.__reward = 8 - self.__extractFeatureDistance(state) / 9.05538 + reward - \
+        self.__reward = 3 - self.__extractFeatureDistance(state) / 9.05538 + reward - \
                         abs(self.__extractFeatureAngleParallelity(state)) - \
                         abs(self.__extractFeatureAngleParallelity2(state))
 
@@ -148,27 +150,34 @@ class Agent:
         values = self.model.predict(np.array(l))
         best = np.argmax(values)
         if self.__step > 1:
-            newReward = reward + self.alpha*np.max(values)
+            newReward = reward + self.alpha * np.max(values)
+            if self.__step > 100:
+                newReward = -20
             print(newReward)
             self.previousValues[0][self.previousAction] = newReward
-            self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
+            self.model.fit(self.previousStep, self.previousValues, epochs=3, verbose=0)
+            if self.__step > 100:
+                return "reset"
         self.previousStep = l
         self.previousValues = np.array(values)
         if random.random() > self.e:
             self.previousAction = best
         else:
-            self.previousAction = random.randint(0, 6*6*6)
+            self.previousAction = random.randint(0, 4 * 4 - 1)
         self.__action = self.__decodeAction(self.previousAction)
         self.e *= self.g
-        if self.__step%1001 == 0 or reward==10:
-            print("hello")
-            self.model.save("model3")
+        # if self.__step%1001 == 0 or reward==10:
+        #     print("hello")
         # Reduce chance of random action as we train the model.
         return self.__action
 
     def end(self, reward):
         print("DONE")
         pass
+
+    def save(self):
+        print("hello")
+        self.model.save("model33")
 
     def cleanup(self):
         print("DONE1")
@@ -179,11 +188,14 @@ class Agent:
 
     def __decodeAction(self, a):
         x = []
-        for i in range(3):
-            y = a % 6
-            for j in range((5, 4, 1)[i]):
-                x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [0, 0, 1], 4: [1, 1, 0], 5: [0, 1, 1]}[y]
-            a //= 6
+        for i in range(2):
+            y = a % 4
+            for j in range((5, 5)[i]):
+                if self.up:
+                    x += {0: [0, 0, 0], 1: [0, 0, 1], 2: [0, 1, 0], 3: [0, 1, 1]}[y]
+                else:
+                    x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [1, 1, 0]}[y]
+            a //= 4
         return x
 
     def __destruct(self):
