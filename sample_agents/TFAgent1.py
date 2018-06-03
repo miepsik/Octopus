@@ -42,15 +42,19 @@ class Agent:
         # Set up control variables
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.5
+        self.e = 0.05
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model22')
+        self.model = keras.models.load_model('model33')
 
         self.__reward = 0
         self.previousStep = np.array([])
         self.previousValues = np.array([])
         self.previousAction = 0
+
+        self.strangeInput = []
+        self.strangeDecision = []
+        self.normalOut = []
 
         self.up = True
 
@@ -137,6 +141,14 @@ class Agent:
 
     def start(self, state):
         "Given starting state, agent returns first action"
+        self.alpha = 0.9
+        self.g = 0.99
+        self.e = 0.05
+        self.__step = 0
+        self.__reward = 0
+        self.previousStep = np.array([])
+        self.previousValues = np.array([])
+        self.previousAction = 0
         return self.step(0, state)
 
     def step(self, reward, state):
@@ -148,7 +160,10 @@ class Agent:
         state = self.getFeatureVector(state, reward)
         l = np.array([state])
         values = self.model.predict(np.array(l))
-        best = np.argmax(values)
+        if self.__step % 3 == 0:
+            best = np.argmax(self.previousValues)
+        else:
+            best = np.argmax(values)
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
             if self.__step > 100:
@@ -157,6 +172,13 @@ class Agent:
             self.previousValues[0][self.previousAction] = newReward
             self.model.fit(self.previousStep, self.previousValues, epochs=3, verbose=0)
             if self.__step > 100:
+                for i in range(len(self.strangeInput)):
+                    x = np.array([self.strangeInput[i]])
+                    y = np.array((self.normalOut[i]))
+                    print(x, y)
+                    y[0, self.strangeDecision] = -2
+                    print(x, y)
+                    self.model.fit(x, y, epochs=2, verbose=0)
                 return "reset"
         self.previousStep = l
         self.previousValues = np.array(values)
@@ -164,6 +186,9 @@ class Agent:
             self.previousAction = best
         else:
             self.previousAction = random.randint(0, 4 * 4 - 1)
+            self.strangeInput.append(state)
+            self.strangeDecision.append(self.previousAction)
+            self.normalOut.append(values)
         self.__action = self.__decodeAction(self.previousAction)
         self.e *= self.g
         # if self.__step%1001 == 0 or reward==10:
@@ -192,6 +217,7 @@ class Agent:
             y = a % 4
             for j in range((5, 5)[i]):
                 if self.up:
+                    # może usunąć też pustą akcję? wtedy będzie tylko 3*3=9 ruchów
                     x += {0: [0, 0, 0], 1: [0, 0, 1], 2: [0, 1, 0], 3: [0, 1, 1]}[y]
                 else:
                     x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [1, 1, 0]}[y]

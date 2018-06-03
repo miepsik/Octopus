@@ -61,26 +61,19 @@ actionDim = int(data[1])
 # instantiate agent
 agent = Agent.Agent(stateDim, actionDim, agentParams)
 
-sendStr('START_LOG')
-sendStr(agent.getName())
+# sendStr('START_LOG')
+# sendStr(agent.getName())
 
 for i in range(numEpisodes):
     sendStr('START')
     data = receive(2 + stateDim)
-
     terminalFlag = int(data[0])
     state = map(float, data[2:])
     action = agent.start(state)
-
     while not terminalFlag:
         sendStr('STEP')
         sendStr(str(actionDim))
         sendAction(action)
-        data = receive(3 + stateDim)
-        sendStr('STEP')
-        sendStr(str(actionDim))
-        sendAction(action)
-
         data = receive(3 + stateDim)
         if not (len(data) == stateDim + 3):
             print('Communication error: calling agent.cleanup()')
@@ -93,10 +86,12 @@ for i in range(numEpisodes):
 
         action = agent.step(reward, state)
         if action == "reset":
-            terminalFlag = 0
+            terminalFlag = 1
 
             sendStr('GET_TASK')
             data = receive(2)
-            sendStr('START_LOG')
-            sendStr(agent.getName())
+            stateDim = int(data[0])
+            actionDim = int(data[1])
+            # sendStr('START_LOG')
+            # sendStr(agent.getName())
     agent.save()
