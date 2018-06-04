@@ -10,7 +10,7 @@ import random
 
 import os
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 # p1 is the center point
@@ -48,7 +48,6 @@ class Agent:
         self.__step = 0
         self.angle = np.arctan2(9, -1)
         self.model = keras.models.load_model('model44')
-
         self.__reward = 0
         self.previousStep = np.array([])
         self.previousValues = np.array([])
@@ -80,16 +79,16 @@ class Agent:
             n = int(f.readline())
             inp = []
             f.readline()
-            for i in range(n-1):
+            for i in range(n - 1):
                 inp.append(np.array([float(x) for x in f.readline().split()]))
             out = []
-            for i in range(n-1):
+            for i in range(n - 1):
                 out.append(np.array([float(x) for x in f.readline().split()]))
                 for j in range(len(out[i])):
                     if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
                         out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
             f.readline()
-            for i in range(n-1):
+            for i in range(n - 1):
                 out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
             x = np.array(inp)
             y = np.array(out)
@@ -132,6 +131,14 @@ class Agent:
             l[i * 4] -= 4.5
             l[i * 4 + 1] -= 1
         return l
+
+    def extractFeatureUpOrLow(self, *args):
+        state = args[0].copy()
+        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
+        a = -1 / 9
+        b = 0
+        ul = xy[:, 0] * a + b - xy[:, 1]
+        return (ul > 0).sum() - (ul < 0).sum()
 
     def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
@@ -208,6 +215,7 @@ class Agent:
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
         state = np.array(list(state)).reshape((1, self.__realStateDim))
+        self.up = (self.extractFeatureUpOrLow(state) > 0)
         if self.__step == 0:
             self.version = int(state[0, 0] * 1000)
         if reward > 9:
@@ -273,7 +281,7 @@ class Agent:
     def save(self):
         mypath = "data/"
         onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
-        self.learnFromFile(mypath+onlyfiles[random.randint(0,len(onlyfiles)-1)])
+        self.learnFromFile(mypath + onlyfiles[random.randint(0, len(onlyfiles) - 1)])
         self.model.save("model44")
 
     def cleanup(self):

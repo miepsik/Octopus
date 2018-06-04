@@ -47,7 +47,15 @@ class Agent:
         self.e = 0.2
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model22')
+        try:
+            self.model = keras.models.load_model('model22')
+        except:
+            self.model = Sequential()
+            self.model.add(InputLayer(batch_input_shape=(1, 4 + 8 * 3 + 1)))
+            self.model.add(Dense(30, activation='sigmoid'))
+            self.model.add(Dense(20, activation='sigmoid'))
+            self.model.add(Dense(4 * 4, activation='linear'))
+            self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
         self.__reward = 0
         self.previousStep = np.array([])
@@ -110,6 +118,16 @@ class Agent:
             l[i * 4] -= 4.5
             l[i * 4 + 1] -= 1
         return l
+        
+    def __extractFeatureUpOrLow(self,*args):
+        state = args[0].copy()
+        print(state)
+        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:,:2]
+        a = -1/9
+        b = 0
+        ul = xy[:,0]*a+b-xy[:,0]
+        print((ul>0).sum() - (ul<0).sum())
+        return (ul>0).sum() - (ul<0).sum()
 
     def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
@@ -178,6 +196,7 @@ class Agent:
             best = np.argmax(self.previousValues)
         else:
             best = np.argmax(values)
+
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
             # if self.__step > 100:
