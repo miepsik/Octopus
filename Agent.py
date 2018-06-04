@@ -45,6 +45,7 @@ class Agent:
         self.e = 0.5
         self.__step = 0
         self.angle = np.arctan2(9, -1)
+		
         self.model = keras.models.load_model('model22')
 
         self.__reward = 0

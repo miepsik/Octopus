@@ -32,19 +32,21 @@ meansum()
     python -c "import sys; from numpy import mean; print(mean([sum(float(r) for r in line.split()) for line in sys.stdin]))"
 }
 
-for instance in $TESTDIR/*.xml; do
+INSTANCES=$(ls $TESTDIR/*.xml | shuf)
+
+for instance in $INSTANCES; do
     test=`basename ${instance%.*}`
     printf "%-12s" "$test "
 
     # Run the server -Djava.endorsed.dirs=environment/lib 
-    java -Duser.language=en -Duser.region=EN -jar environment/octopus-environment.jar external_gui $instance $PORT &
+    java -Duser.language=en -Duser.region=EN -jar environment/octopus-environment.jar external $instance $PORT &
     server_pid=$! 
 
     # run the agent
     pushd agent/python >/dev/null
     exit_status=1
     while true; do
-        $PYTHON agent_handler.py localhost $PORT 1 #>/dev/null 2>&1
+        $PYTHON -W ignore agent_handler.py localhost $PORT 1 #>/dev/null 2>&1
         if [ $? -eq 0 ]; then break; fi
         sleep $SLEEP_TIME # I need some time here to let the port be created
     done

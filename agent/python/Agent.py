@@ -1,176 +1,250 @@
+# -*- coding: utf-8 -*-
+
 import numpy as np
 import tensorflow as tf
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, InputLayer
+import math
+import random
 
 import os
 
+
+# p1 is the center point
+def angleBetweenPoints(p0, p1, p2):
+    a = (p1[0] - p0[0]) ** 2 + (p1[1] - p0[1]) ** 2
+    b = (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2
+    c = (p2[0] - p0[0]) ** 2 + (p2[1] - p0[1]) ** 2
+    return math.acos((a + b - c) / math.sqrt(4 * a * b))
+
+
 class Agent:
-	"A template agent learning using Tensorflow"
-	
-	#name should contain only letters, digits, and underscores (not enforced by environment)
-	__name = 'TF0'
-	
-	def __init__(self, stateDim, actionDim, agentParams):
-		"Initialize agent assuming floating point state and action"
-		
-		self.featureExtractors = [getattr(self, m) for m in dir(self) if m.startswith("_Agent__extractFeature") and callable(getattr(self, m))]
-		
-		self.__realStateDim = stateDim
-		self.__stateDim = len(self.featureExtractors)
-		self.__realActionDim = actionDim
-		self.__actionDim = 3
-		assert self.__actionDim%3==0
-		assert (stateDim - 2)%4==0
-		self.__action = np.zeros(actionDim)
-		
-		#Set up control variables
-		self.alpha = 0.1
-		self.g = 0.9
-		self.e = 0.1
-		self.__step = 0
-		self.CKPT = "../../tmp/model.ckpt"
-		self.angle = np.arctan2(9,-1)
-		
-		#Set up neural network
-		os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-		tf.reset_default_graph()
-		self.input = tf.placeholder(shape=[1,self.__stateDim],dtype=tf.float32)
-		self.theta = tf.Variable(tf.random_uniform([self.__stateDim,2**self.__actionDim],0,0.01))
-		self.Q	  = tf.matmul(self.input,self.theta)
-		self.bestQ= tf.argmax(self.Q,1)
-		
-		self.Qprime= tf.placeholder(shape=[1,2**self.__actionDim],dtype=tf.float32)
-		self.loss  = tf.reduce_sum(tf.square(self.Qprime - self.Q))
-		self.trainer = tf.train.GradientDescentOptimizer(learning_rate=self.alpha)
-		self.updateModel = self.trainer.minimize(self.loss)
-		self.init = tf.global_variables_initializer()
-		self.saver = tf.train.Saver()
-		self.__session = tf.Session()
-		self.__session.run(self.init)
-		
-		self.__reward = 0
-		
-		if os.path.isfile(self.CKPT):
-			self.saver.restore(self.__session,self.CKPT)
-			
-	def __extractFeatureReward(self,*args):
-		"Reward"
-		return self.__reward
-			
-	def __extractFeatureCenterOfGravity(self,*args):
-		"Center of gravity (equal masses of points)"
-		state = args[0]
-		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[:,:2]
-		return np.sqrt(np.square(xy).sum(1)).mean()
-		
-			
-	def __extractFeatureDistance(self,*args):
-		"Euklidean distance from closest to (9,-1)"
-		state = args[0]
-		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[:,:2]
-		xy-= [9,-1]
-		return np.sqrt(np.square(xy).sum(1).min())
-		
-	def __extractFeatureAngleParallelity(self,*args):
-		"Angle stopping tentacle from parallelity with [(0,0),(9,-1)]"
-		return args[0][0][0] - self.angle
-		#Nie wiem, czy kąt zwracany przez status nie jest aby przesunięty
-		#Może się opłacać znormalizować a między <-pi,pi>
-	
-	def __extractFeatureVertexCloser(self,*args):
-		"Which vertex of the tentacle is closer (-1 if lower, 1 if upper)"
-		state = args[0]
-		xy = state[0,2:].reshape(int((self.__realStateDim-2)/4),4)[[9,19],:2]
-		return np.argmin(np.square(xy - [9,-1]).sum(1))*2-1	
-		
-	def __getFeatureVector(self,state,reward):
-		"Convert input parameters to vecture of features"
-		f = []
-		for m in self.featureExtractors:
-			# print(m.__name__,m(state,reward))
-			f += [m(state,reward)]
-		return np.array(f).reshape((1,self.__stateDim))
-		
-	def __getActionAndItsPrediction(self,state):
-		"Choose an action by greedily (with e chance of random action) from the Q-network"
-		
-		a,allQ = self.__session.run([self.bestQ,self.Q],feed_dict={self.input:state})
+    "A template agent learning using Tensorflow"
 
-		if np.random.rand(1) < self.e:
-			a = np.random.randint(0,2**self.__actionDim,size=(1))
-		
-		self.__lastState = state
-		self.__actionEncoded = a[0]
-		self.__predictedQ = allQ[0,a[0]]
-		self.__predictedAllQ = allQ
-		return self.__decodeAction(a[0])
-		
-	def __getReward(self,state,reward):
-		"distance from point + reward"
-		self.__reward = 1 - self.__extractFeatureDistance(state)/9.05538 + reward
-		
-			
-	def start(self, state):
-		"Given starting state, agent returns first action"
-		self.__step += 1
-		state = np.array(list(state)).reshape((1,self.__realStateDim))
-		state = self.__getFeatureVector(state,0)
-		self.__action = self.__getActionAndItsPrediction(state)
-		return self.__action
-	
-	def step(self, reward, state):
-		"Given current reward and state, agent returns next action"
-		self.__step += 1
-		self.__reward += reward
-		state = np.array(list(state)).reshape((1,self.__realStateDim))
-		
-		self.__getReward(state,reward)
-		state = self.__getFeatureVector(state,reward)
-		
-		Q = self.__session.run(self.Q,feed_dict={self.input:state})
-		maxQ = np.max(Q)
-		targetQ = self.__predictedAllQ
-		targetQ[0,self.__actionEncoded] = self.__reward + self.g * maxQ
-		#Train our network using target and predicted Q values
-		_,W1 = self.__session.run([self.updateModel,self.theta],feed_dict={self.input:self.__lastState,self.Qprime:targetQ})
-		
-		self.__action = self.__getActionAndItsPrediction(state)		
-		
-		#Reduce chance of random action as we train the model.
-		self.e = 1./(self.__step/1000 + 10)
-		
-		if self.__step%1001 == 0 or reward==10:
-			self.saver.save(self.__session, self.CKPT)
-				
-		return self.__action
-	
-	def end(self, reward):
-		pass
-	
-	def cleanup(self):
-		pass
-	
-	def getName(self):
-		return self.__name
-	
-	def __decodeAction(self,a):
-		b = np.array(list(bin(a))[2:])
+    # name should contain only letters, digits, and underscores (not enforced by environment)
+    __name = 'TF1'
 
-		l = self.__actionDim - len(b)
-		b = np.append(np.zeros(l),b).reshape((int(self.__actionDim/3),3))
-		b = np.repeat(b,int(self.__realActionDim/self.__actionDim),axis=0)
-		l = int(self.__realActionDim/3 - len(b))
-		b = np.append(b,np.full((l,3),b[-1]))
+    def __init__(self, stateDim, actionDim, agentParams):
+        "Initialize agent assuming floating point state and action"
 
-		return b.reshape((self.__realActionDim)).astype(np.float32)
-		
-	def __destruct(self):
-		print("Ala ma kota")
-		self.__session.close()
-		
-	def __exit__(self, exc_type, exc_value, traceback):
-		self.__destruct()
-		
-	def __del__(self):
-		self.__destruct()
-	
-			
+        self.featureExtractors = [getattr(self, m) for m in dir(self) if
+                                  m.startswith("_Agent__extractFeature") and callable(getattr(self, m))]
+
+        self.__realStateDim = stateDim
+        self.__stateDim = len(self.featureExtractors)
+        self.__realActionDim = actionDim
+        self.__actionDim = 3
+        assert self.__actionDim % 3 == 0
+        assert (stateDim - 2) % 4 == 0
+        self.__action = np.zeros(actionDim)
+
+        # Set up control variables
+        self.alpha = 0.9
+        self.g = 0.99
+        self.e = 0.2
+        self.__step = 0
+        self.angle = np.arctan2(9, -1)
+        self.model = keras.models.load_model('model22')
+
+        self.__reward = 0
+        self.previousStep = np.array([])
+        self.previousValues = np.array([])
+        self.previousAction = 0
+
+        self.strangeInput = []
+        self.strangeDecision = []
+        self.normalOut = []
+        self.allInput = []
+        self.allOut = []
+        self.allDecision = []
+
+        self.up = True
+
+    # def __extractFeatureReward(self, *args):
+    #     "Reward"
+    #     return self.__reward
+    #
+    # def __extractFeatureCenterOfGravity(self, *args):
+    #     "Center of gravity (equal masses of points)"
+    #     state = args[0].copy()
+    #     xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
+    #     return np.sqrt(np.square(xy).sum(1)).mean()
+
+    def __extractFeatureDistance(self, *args):
+        "Euklidean distance from closest to (9,-1)"
+        state = args[0].copy()
+        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:,
+             :2]  # lista punktów (x,y)(czubki segmentów macki)
+        xy -= [9, -1]
+        return np.sqrt(np.square(xy).sum(1).min())
+
+    def __extractFeatureAngleParallelity(self, *args):
+        state = args[0][0]
+        "Angle stopping tentacle from parallelity with [(0,0),(9,-1)]"
+        return angleBetweenPoints((9, -1), state[34:36], state[38:40])
+
+    def __extractFeatureAngleParallelity2(self, *args):
+        state = args[0][0]
+        "Angle stopping tentacle from parallelity with [(0,0),(9,-1)]"
+        return angleBetweenPoints((9, -1), state[74:76], state[78:80])
+
+    def __extractFeatureVertexCloser(self, *args):
+        "Which vertex of the tentacle is closer (-1 if lower, 1 if upper)"
+        state = args[0].copy()
+        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[[9, 19],
+             :2]  # lista punktów (x,y)(czubki segmentów macki)
+        return np.argmin(np.square(xy - [9, -1]).sum(1)) * 2 - 1
+
+    def __extractImportantPoints(self, *args):
+        state = args[0][0][2:]
+        l = []
+        for i in (0, 4, 7):
+            for j in range(4):
+                l.append(state[4 * i + j])
+            for j in range(4):
+                l.append(state[4 * i + 40 + j])
+        for i in range(6):
+            l[i * 4] -= 4.5
+            l[i * 4 + 1] -= 1
+        return l
+
+    def getFeatureVector(self, state, reward):
+        "Convert input parameters to vecture of features"
+        self.__reward += reward
+        st = state.copy()
+        state = np.array(list(state)).reshape((1, self.__realStateDim))
+        f = []
+        for m in self.featureExtractors:
+            s = state.copy()
+            # print(m.__name__,m(state,reward))
+            f += [m(s, reward)]
+        f += self.__extractImportantPoints(st)
+        return f
+
+    def __getActionAndItsPrediction(self, state):
+        "Choose an action by greedily (with e chance of random action) from the Q-network"
+
+        a, allQ = self.__session.run([self.bestQ, self.Q], feed_dict={self.input: state})
+
+        if np.random.rand(1) < self.e:
+            a = np.random.randint(0, 2 ** self.__actionDim, size=(1))
+
+        self.__lastState = state
+        self.__actionEncoded = a[0]
+        self.__predictedQ = allQ[0, a[0]]
+        self.__predictedAllQ = allQ
+        return self.__decodeAction(a[0])
+
+    def __getReward(self, state, reward):
+        "distance from point + reward"
+        self.__reward = 3 - self.__extractFeatureDistance(state) / 9.05538 + reward - \
+                        abs(self.__extractFeatureAngleParallelity(state)) - \
+                        abs(self.__extractFeatureAngleParallelity2(state))
+
+    def start(self, state):
+        "Given starting state, agent returns first action"
+        self.alpha = 0.9
+        self.g = 0.99
+        self.e = 0.2
+        self.__step = 0
+        self.__reward = 0
+        self.previousStep = np.array([])
+        self.previousValues = np.array([])
+        self.previousAction = 0
+        return self.step(0, state)
+
+    def step(self, reward, state):
+        "Given current reward and state, agent returns next action"
+        if reward > 9:
+            for i in range(len(self.allInput)):
+                x = np.array([self.allInput[i]])
+                y = np.array((self.allOut[i]))
+                y[0, self.allDecision[i]] = 15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i)
+                # print(15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i))
+                self.model.fit(x, y, epochs=5, verbose=0)
+        if reward > 9:
+            reward *= 3
+        self.__step += 1
+        self.__reward += reward
+        state = np.array(list(state)).reshape((1, self.__realStateDim))
+        # self.__getReward(state, reward)
+        state = self.getFeatureVector(state, reward)
+        l = np.array([state])
+        values = self.model.predict(np.array(l))
+        if self.__step % 3 == 0:
+            best = np.argmax(self.previousValues)
+        else:
+            best = np.argmax(values)
+        if self.__step > 1:
+            newReward = reward + self.alpha * np.max(values)
+            # if self.__step > 100:
+            #     newReward = -20
+            # print(newReward)
+            self.previousValues[0][self.previousAction] = newReward
+            self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
+            # if self.__step > 100:
+                # for i in range(len(self.strangeInput)):
+                    # x = np.array([self.strangeInput[i]])
+                    # y = np.array((self.normalOut[i]))
+                    # y[0, self.strangeDecision[i]] = -20
+                    # self.model.fit(x, y, epochs=2, verbose=0)
+                # return "reset"
+
+        self.previousStep = l
+        self.previousValues = np.array(values)
+        if random.random() > self.e:
+            self.previousAction = best
+        else:
+            self.previousAction = random.randint(0, 4 * 4 - 1)
+            self.strangeInput.append(state)
+            self.strangeDecision.append(self.previousAction)
+            self.normalOut.append(values)
+        self.allDecision.append(self.previousAction)
+        self.allOut.append(values)
+        self.allInput.append(state)
+        self.__action = self.__decodeAction(self.previousAction)
+        self.e *= self.g
+        # if self.__step%1001 == 0 or reward==10:
+        #     print("hello")
+        # Reduce chance of random action as we train the model.
+        # print(self.__action)
+        return self.__action
+
+    def end(self, reward):
+        # print("DONE")
+        pass
+
+    def save(self):
+        # print("hello")
+        self.model.save("model44")
+
+    def cleanup(self):
+        # print("DONE1")
+        pass
+
+    def getName(self):
+        return self.__name
+
+    def __decodeAction(self, a):
+        x = []
+        for i in range(2):
+            y = a % 4
+            for j in range((5, 5)[i]):
+                if self.up:
+                    # może usunąć też pustą akcję? wtedy będzie tylko 3*3=9 ruchów
+                    x += {0: [0, 0, 0], 1: [0, 0, 1], 2: [0, 1, 0], 3: [0, 1, 1]}[y]
+                else:
+                    x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [1, 1, 0]}[y]
+            a //= 4
+        return x
+
+    def __destruct(self):
+        # print("Ala ma kota")
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.__destruct()
+
+    def __del__(self):
+        self.__destruct()

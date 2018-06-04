@@ -45,7 +45,7 @@ class Agent:
         self.e = 0.2
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model44')
+        self.model = keras.models.load_model('model22')
 
         self.__reward = 0
         self.previousStep = np.array([])
@@ -180,16 +180,16 @@ class Agent:
             newReward = reward + self.alpha * np.max(values)
             # if self.__step > 100:
             #     newReward = -20
-            print(newReward)
+            # print(newReward)
             self.previousValues[0][self.previousAction] = newReward
             self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
-            if self.__step > 100:
-                for i in range(len(self.strangeInput)):
-                    x = np.array([self.strangeInput[i]])
-                    y = np.array((self.normalOut[i]))
-                    y[0, self.strangeDecision[i]] = -20
-                    self.model.fit(x, y, epochs=2, verbose=0)
-                return "reset"
+            # if self.__step > 100:
+                # for i in range(len(self.strangeInput)):
+                    # x = np.array([self.strangeInput[i]])
+                    # y = np.array((self.normalOut[i]))
+                    # y[0, self.strangeDecision[i]] = -20
+                    # self.model.fit(x, y, epochs=2, verbose=0)
+                # return "reset"
 
         self.previousStep = l
         self.previousValues = np.array(values)
@@ -208,18 +208,19 @@ class Agent:
         # if self.__step%1001 == 0 or reward==10:
         #     print("hello")
         # Reduce chance of random action as we train the model.
+        # print(self.__action)
         return self.__action
 
     def end(self, reward):
-        print("DONE")
+        # print("DONE")
         pass
 
     def save(self):
-        print("hello")
+        # print("hello")
         self.model.save("model44")
 
     def cleanup(self):
-        print("DONE1")
+        # print("DONE1")
         pass
 
     def getName(self):
@@ -239,7 +240,8 @@ class Agent:
         return x
 
     def __destruct(self):
-        print("Ala ma kota")
+        # print("Ala ma kota")
+        pass
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.__destruct()
