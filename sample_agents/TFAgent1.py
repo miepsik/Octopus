@@ -215,7 +215,7 @@ class Agent:
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-        self.up = (self.extractFeatureUpOrLow(state) > 0)
+        # self.up = (self.extractFeatureUpOrLow(state) > 0)
         if self.__step == 0:
             self.version = int(state[0, 0] * 1000)
         if reward > 9:
