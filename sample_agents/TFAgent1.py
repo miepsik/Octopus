@@ -61,6 +61,8 @@ class Agent:
 
         self.up = True
 
+        self.version = 0
+
     # def __extractFeatureReward(self, *args):
     #     "Reward"
     #     return self.__reward
@@ -70,6 +72,24 @@ class Agent:
     #     state = args[0].copy()
     #     xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
     #     return np.sqrt(np.square(xy).sum(1)).mean()
+
+    def learnFromFile(self, file):
+        with open(file, "r") as f:
+            n = int(f.readline())
+            inp = []
+            for i in range(n):
+                inp.append(np.array([float(x) for x in f.readline().split()]))
+            out = []
+            for i in range(n):
+                out.append(np.array([float(x) for x in f.readline().split()]))
+                for j in range(len(out[i])):
+                    if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
+                        out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
+            for i in range(n):
+                out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
+            x = np.array(inp)
+            y = np.array(out)
+            self.model.fit(np.array(inp), np.array(out), epochs=5, batch_size=1, verbose=1)
 
     def __extractFeatureDistance(self, *args):
         "Euklidean distance from closest to (9,-1)"
@@ -138,7 +158,7 @@ class Agent:
 
     def __getReward(self, state, reward):
         "distance from point + reward"
-        self.__reward = 3 - self.__extractFeatureDistance(state) / 9.05538 + reward - \
+        self.__reward = 3 - 2 * self.__extractFeatureDistance(state) / 9.05538 + reward - \
                         abs(self.__extractFeatureAngleParallelity(state)) - \
                         abs(self.__extractFeatureAngleParallelity2(state))
 
@@ -152,27 +172,57 @@ class Agent:
         self.previousStep = np.array([])
         self.previousValues = np.array([])
         self.previousAction = 0
+
+        self.strangeInput = []
+        self.strangeDecision = []
+        self.normalOut = []
+        self.allInput = []
+        self.allOut = []
+        self.allDecision = []
         return self.step(0, state)
+
+    def writeFile(self):
+        with open("data/dat" + str(self.version), "w") as f:
+            f.write(str(self.__step) + "\n")
+            for inp in self.allInput:
+                f.write(' '.join([str(x) for x in inp]) + "\n")
+            for out in self.allOut:
+                f.write(' '.join([str(x) for x in out[0]]) + "\n")
+            for x in self.allDecision:
+                f.write(str(x) + "\n")
+
+    def saveData(self):
+        if os.path.isfile("data/dat" + str(self.version)):
+            f = open("data/dat" + str(self.version), "r")
+            x = int(f.readline())
+            f.close()
+            if x > self.__step:
+                self.writeFile()
+        else:
+            self.writeFile()
 
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
+        state = np.array(list(state)).reshape((1, self.__realStateDim))
+        if self.__step == 0:
+            self.version = int(state[0, 0] * 1000)
         if reward > 9:
             for i in range(len(self.allInput)):
                 x = np.array([self.allInput[i]])
                 y = np.array((self.allOut[i]))
-                y[0, self.allDecision[i]] = 15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i)
+                y[0, self.allDecision[i]] = 15 - 0.01 * self.__step - 0.05 * (len(self.allInput) - i)
                 # print(15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i))
-                self.model.fit(x, y, epochs=5, verbose=0)
+                self.model.fit(x, y, epochs=10, verbose=0)
+                self.saveData()
         if reward > 9:
             reward *= 3
         self.__step += 1
         self.__reward += reward
-        state = np.array(list(state)).reshape((1, self.__realStateDim))
         # self.__getReward(state, reward)
         state = self.getFeatureVector(state, reward)
         l = np.array([state])
         values = self.model.predict(np.array(l))
-        if self.__step % 3 == 0:
+        if self.__step % 2 == 0:
             best = np.argmax(self.previousValues)
         else:
             best = np.argmax(values)
@@ -187,7 +237,7 @@ class Agent:
                 for i in range(len(self.strangeInput)):
                     x = np.array([self.strangeInput[i]])
                     y = np.array((self.normalOut[i]))
-                    y[0, self.strangeDecision[i]] = -20
+                    y[0, self.strangeDecision[i]] = 0
                     self.model.fit(x, y, epochs=2, verbose=0)
                 return "reset"
 
@@ -216,6 +266,9 @@ class Agent:
 
     def save(self):
         print("hello")
+        mypath = "data/"
+        onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
+        self.learnFromFile(mypath+onlyfiles[random.randint(0,len(onlyfiles)-1)])
         self.model.save("model44")
 
     def cleanup(self):
