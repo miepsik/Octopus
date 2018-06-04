@@ -144,7 +144,7 @@ class Agent:
         xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:,:2]
         a = -1/9
         b = 0
-        ul = xy[:,0]*a+b-xy[:,0]
+        ul = xy[:,0]*a+b-xy[:,1]
         return (ul>0).sum() - (ul<0).sum()
 
     def getFeatureVector(self, state, reward):
