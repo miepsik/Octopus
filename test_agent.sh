@@ -39,7 +39,7 @@ for instance in $INSTANCES; do
     printf "%-12s" "$test "
 
     # Run the server -Djava.endorsed.dirs=environment/lib 
-    java -Duser.language=en -Duser.region=EN -jar environment/octopus-environment.jar external $instance $PORT &
+    java -Duser.language=en -Duser.region=EN -jar environment/octopus-environment.jar external_gui $instance $PORT &
     server_pid=$! 
 
     # run the agent

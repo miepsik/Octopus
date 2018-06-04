@@ -47,6 +47,7 @@ class Agent:
         self.e = -0.2
         self.__step = 0
         self.angle = np.arctan2(9, -1)
+
         self.model = keras.models.load_model('model44')
         self.__reward = 0
         self.previousStep = np.array([])
@@ -131,14 +132,14 @@ class Agent:
             l[i * 4] -= 4.5
             l[i * 4 + 1] -= 1
         return l
-
-    def extractFeatureUpOrLow(self, *args):
-        state = args[0].copy()
-        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
-        a = -1 / 9
+        
+    def __extractUpOrLow(self,state):
+        xy = np.array(state[0,2:]).reshape(int((self.__realStateDim - 1) / 4), 4)[:,:2]
+        a = -1/9
         b = 0
-        ul = xy[:, 0] * a + b - xy[:, 1]
-        return (ul > 0).sum() - (ul < 0).sum()
+        ul = xy[:,0]*a+b-xy[:,1]
+        print(((ul<0).sum() - (ul>0).sum())>0)
+        return ((ul<0).sum() - (ul>0).sum())>0
 
     def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
@@ -215,7 +216,7 @@ class Agent:
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-        # self.up = (self.extractFeatureUpOrLow(state) > 0)
+        self.up = self.__extractUpOrLow(state)
         if self.__step == 0:
             self.version = int(state[0, 0] * 1000)
         if reward > 9:
