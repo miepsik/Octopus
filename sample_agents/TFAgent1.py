@@ -44,10 +44,10 @@ class Agent:
         # Set up control variables
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.2
+        self.e = -0.2
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        self.model = keras.models.load_model('model22')
+        self.model = keras.models.load_model('model44')
 
         self.__reward = 0
         self.previousStep = np.array([])
@@ -79,19 +79,21 @@ class Agent:
         with open(file, "r") as f:
             n = int(f.readline())
             inp = []
-            for i in range(n):
+            f.readline()
+            for i in range(n-1):
                 inp.append(np.array([float(x) for x in f.readline().split()]))
             out = []
-            for i in range(n):
+            for i in range(n-1):
                 out.append(np.array([float(x) for x in f.readline().split()]))
                 for j in range(len(out[i])):
                     if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
                         out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
-            for i in range(n):
+            f.readline()
+            for i in range(n-1):
                 out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
             x = np.array(inp)
             y = np.array(out)
-            self.model.fit(np.array(inp), np.array(out), epochs=5, batch_size=1, verbose=1)
+            self.model.fit(np.array(inp), np.array(out), epochs=25, batch_size=1, verbose=1)
 
     def __extractFeatureDistance(self, *args):
         "Euklidean distance from closest to (9,-1)"
@@ -224,10 +226,17 @@ class Agent:
         state = self.getFeatureVector(state, reward)
         l = np.array([state])
         values = self.model.predict(np.array(l))
-        if self.__step % 2 == 0:
-            best = np.argmax(self.previousValues)
+        action = 0
+        if self.__step % 5 == 1:
+            if random.random() > self.e:
+                action = np.argmax(values)
+            else:
+                action = random.randint(0, 4 * 4 - 1)
+                self.strangeInput.append(state)
+                self.strangeDecision.append(self.previousAction)
+                self.normalOut.append(values)
         else:
-            best = np.argmax(values)
+            action = self.previousAction
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
             # if self.__step > 100:
@@ -235,7 +244,7 @@ class Agent:
             # print(newReward)
             self.previousValues[0][self.previousAction] = newReward
             self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
-            if self.__step > 100:
+            if self.__step > 150:
                 for i in range(len(self.strangeInput)):
                     x = np.array([self.strangeInput[i]])
                     y = np.array((self.normalOut[i]))
@@ -245,13 +254,7 @@ class Agent:
 
         self.previousStep = l
         self.previousValues = np.array(values)
-        if random.random() > self.e:
-            self.previousAction = best
-        else:
-            self.previousAction = random.randint(0, 4 * 4 - 1)
-            self.strangeInput.append(state)
-            self.strangeDecision.append(self.previousAction)
-            self.normalOut.append(values)
+        self.previousAction = action
         self.allDecision.append(self.previousAction)
         self.allOut.append(values)
         self.allInput.append(state)
@@ -287,9 +290,9 @@ class Agent:
             for j in range((5, 5)[i]):
                 if self.up:
                     # może usunąć też pustą akcję? wtedy będzie tylko 3*3=9 ruchów
-                    x += {0: [0, 0, 0], 1: [0, 0, 1], 2: [0, 1, 0], 3: [0, 1, 1]}[y]
+                    x += {0: [1, 0, 0], 1: [0, 0, 1], 2: [0, 1, 0], 3: [0, 1, 1]}[y]
                 else:
-                    x += {0: [0, 0, 0], 1: [1, 0, 0], 2: [0, 1, 0], 3: [1, 1, 0]}[y]
+                    x += {0: [0, 0, 1], 1: [1, 0, 0], 2: [0, 1, 0], 3: [1, 1, 0]}[y]
             a //= 4
         return x
 
