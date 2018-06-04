@@ -47,16 +47,8 @@ class Agent:
         self.e = 0.2
         self.__step = 0
         self.angle = np.arctan2(9, -1)
-        try:
-            self.model = keras.models.load_model('model22')
-        except:
-            self.model = Sequential()
-            self.model.add(InputLayer(batch_input_shape=(1, 4 + 8 * 3 + 1)))
-            self.model.add(Dense(30, activation='sigmoid'))
-            self.model.add(Dense(20, activation='sigmoid'))
-            self.model.add(Dense(4 * 4, activation='linear'))
-            self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
-
+        self.model = keras.models.load_model('model22')
+        
         self.__reward = 0
         self.previousStep = np.array([])
         self.previousValues = np.array([])
@@ -139,13 +131,13 @@ class Agent:
             l[i * 4 + 1] -= 1
         return l
         
-    def __extractFeatureUpOrLow(self,*args):
-        state = args[0].copy()
-        xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:,:2]
+    def __extractUpOrLow(self,state):
+        xy = np.array(state[0,2:]).reshape(int((self.__realStateDim - 1) / 4), 4)[:,:2]
         a = -1/9
         b = 0
         ul = xy[:,0]*a+b-xy[:,1]
-        return (ul>0).sum() - (ul<0).sum()
+        print(((ul<0).sum() - (ul>0).sum())>0)
+        return ((ul<0).sum() - (ul>0).sum())>0
 
     def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
@@ -222,6 +214,7 @@ class Agent:
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
         state = np.array(list(state)).reshape((1, self.__realStateDim))
+        self.up = self.__extractUpOrLow(state)
         if self.__step == 0:
             self.version = int(state[0, 0] * 1000)
         if reward > 9:
