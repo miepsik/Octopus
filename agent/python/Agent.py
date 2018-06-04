@@ -10,6 +10,8 @@ import random
 
 import os
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
 
 # p1 is the center point
 def angleBetweenPoints(p0, p1, p2):
