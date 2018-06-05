@@ -75,7 +75,38 @@ class Agent:
     #     xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[:, :2]
     #     return np.sqrt(np.square(xy).sum(1)).mean()
 
+    def learnFromAll(self):
+        mypath = "data/"
+        files = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
+        x = []
+        y = []
+        for s in files:
+            if s == "dat"+str(self.version):
+                continue
+            f = open(mypath+s, 'r')
+            n = int(f.readline())
+            inp = []
+            f.readline()
+            for i in range(n - 1):
+                inp.append(np.array([float(x) for x in f.readline().split()]))
+            out = []
+            for i in range(n - 1):
+                out.append(np.array([float(x) for x in f.readline().split()]))
+                for j in range(len(out[i])):
+                    if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
+                        out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
+            f.readline()
+            for i in range(n - 1):
+                out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
+                x.append(inp[i])
+                y.append(out[i])
+        x = np.array(x)
+        y = np.array(y)
+        self.model.fit(x, y, epochs=25, batch_size=1, verbose=1)
+
     def learnFromFile(self, file):
+        if file == "data/dat"+str(self.version):
+            return
         with open(file, "r") as f:
             n = int(f.readline())
             inp = []
@@ -138,7 +169,7 @@ class Agent:
         a = -1/9
         b = 0
         ul = xy[:,0]*a+b-xy[:,1]
-        print(((ul<0).sum() - (ul>0).sum())>0)
+        # print(((ul<0).sum() - (ul>0).sum())>0)
         return ((ul<0).sum() - (ul>0).sum())>0
 
     def getFeatureVector(self, state, reward):
@@ -178,7 +209,7 @@ class Agent:
         "Given starting state, agent returns first action"
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.2
+        self.e = 0.3
         self.__step = 0
         self.__reward = 0
         self.previousStep = np.array([])
@@ -280,9 +311,12 @@ class Agent:
         pass
 
     def save(self):
-        mypath = "data/"
-        onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
-        self.learnFromFile(mypath + onlyfiles[random.randint(0, len(onlyfiles) - 1)])
+        if random.random() > 0.9:
+            mypath = "data/"
+            onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
+            self.learnFromFile(mypath + onlyfiles[random.randint(0, len(onlyfiles) - 1)])
+        else:
+            self.learnFromAll()
         self.model.save("model44")
 
     def cleanup(self):
