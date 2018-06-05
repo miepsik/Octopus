@@ -86,23 +86,23 @@ class Agent:
             f = open(mypath+s, 'r')
             n = int(f.readline())
             inp = []
-            f.readline()
-            for i in range(n - 1):
+            # f.readline()
+            for i in range(n ):
                 inp.append(np.array([float(x) for x in f.readline().split()]))
             out = []
-            for i in range(n - 1):
+            for i in range(n ):
                 out.append(np.array([float(x) for x in f.readline().split()]))
                 for j in range(len(out[i])):
                     if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
                         out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
-            f.readline()
-            for i in range(n - 1):
+            # f.readline()
+            for i in range(n ):
                 out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
                 x.append(inp[i])
                 y.append(out[i])
         x = np.array(x)
         y = np.array(y)
-        self.model.fit(x, y, epochs=25, batch_size=1, verbose=1)
+        self.model.fit(x, y, epochs=5, batch_size=1, verbose=1)
 
     def learnFromFile(self, file):
         if file == "data/dat"+str(self.version):
@@ -110,21 +110,21 @@ class Agent:
         with open(file, "r") as f:
             n = int(f.readline())
             inp = []
-            f.readline()
-            for i in range(n - 1):
+            # f.readline()
+            for i in range(n):
                 inp.append(np.array([float(x) for x in f.readline().split()]))
             out = []
-            for i in range(n - 1):
+            for i in range(n):
                 out.append(np.array([float(x) for x in f.readline().split()]))
                 for j in range(len(out[i])):
                     if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
                         out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
-            f.readline()
-            for i in range(n - 1):
+            # f.readline()
+            for i in range(n):
                 out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
             x = np.array(inp)
             y = np.array(out)
-            self.model.fit(np.array(inp), np.array(out), epochs=25, batch_size=1, verbose=1)
+            self.model.fit(np.array(inp), np.array(out), epochs=5, batch_size=1, verbose=1)
 
     def __extractFeatureDistance(self, *args):
         "Euklidean distance from closest to (9,-1)"
@@ -150,6 +150,12 @@ class Agent:
         xy = state[0, 2:].reshape(int((self.__realStateDim - 2) / 4), 4)[[9, 19],
              :2]  # lista punktów (x,y)(czubki segmentów macki)
         return np.argmin(np.square(xy - [9, -1]).sum(1)) * 2 - 1
+
+    def shouldAttack(self, state):
+        print(state[1], state[2], state[0])
+        if (state[1] < 0.08 or state[2] < 0.08) and state[0] < 1.5:
+            return True
+        return False
 
     def __extractImportantPoints(self, *args):
         state = args[0][0][2:]
@@ -209,7 +215,7 @@ class Agent:
         "Given starting state, agent returns first action"
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.3
+        self.e = 0.2
         self.__step = 0
         self.__reward = 0
         self.previousStep = np.array([])
@@ -257,17 +263,18 @@ class Agent:
                 y[0, self.allDecision[i]] = 15 - 0.01 * self.__step - 0.05 * (len(self.allInput) - i)
                 # print(15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i))
                 self.model.fit(x, y, epochs=10, verbose=0)
-                self.saveData()
+            self.saveData()
         if reward > 9:
             reward *= 3
         self.__step += 1
         self.__reward += reward
         # self.__getReward(state, reward)
         state = self.getFeatureVector(state, reward)
+        # self.shouldAttack(state)
         l = np.array([state])
         values = self.model.predict(np.array(l))
         action = 0
-        if self.__step % 5 == 1:
+        if self.__step % 4 == 1:
             if random.random() > self.e:
                 action = np.argmax(values)
             else:
@@ -277,6 +284,9 @@ class Agent:
                 self.normalOut.append(values)
         else:
             action = self.previousAction
+        if self.shouldAttack(state):
+            action = 10
+            print("ATTACK")
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
             # if self.__step > 100:
