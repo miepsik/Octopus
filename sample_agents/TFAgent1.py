@@ -102,7 +102,7 @@ class Agent:
                 y.append(out[i])
         x = np.array(x)
         y = np.array(y)
-        self.model.fit(x, y, epochs=5, batch_size=1, verbose=1)
+        self.model.fit(x, y, epochs=55, batch_size=1, verbose=1)
 
     def learnFromFile(self, file):
         if file == "data/dat" + str(self.version):
@@ -155,8 +155,8 @@ class Agent:
         orgState = orgState[0]
         angle1 = angleBetweenPoints((9, -1), orgState[26:28], orgState[30:32])
         angle2 = angleBetweenPoints((9, -1), orgState[66:68], orgState[70:72])
-        print(state[1], angle1, state[2], angle2, state[0])
-        if (state[1] + angle1 < 0.5 or state[2] + angle2 < 0.5) and state[0] < 1.25:
+        # print(state[1], angle1, state[2], angle2, state[0])
+        if (state[1] + angle1 < 0.5 or state[2] + angle2 < 0.5) and state[0] < .25:
             return True
         return False
 
@@ -218,7 +218,7 @@ class Agent:
         "Given starting state, agent returns first action"
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.15
+        self.e = 0.1
         self.__step = 0
         self.__reward = 0
         self.previousStep = np.array([])
@@ -256,8 +256,8 @@ class Agent:
     def step(self, reward, state):
         "Given current reward and state, agent returns next action"
         state = np.array(list(state)).reshape((1, self.__realStateDim))
-        self.up = self.__extractUpOrLow(state)
-        print(self.up)
+        if self.__step == 0:
+            self.up = self.__extractUpOrLow(state)
         if self.__step == 0:
             self.version = int(state[0, 0] * 1000)
         if reward > 9:
@@ -289,8 +289,14 @@ class Agent:
                 self.normalOut.append(values)
         else:
             action = self.previousAction
+        # if self.__step < 40:
+        #     action = 0
+        # elif self.__step < 95:
+        #     action = 2
+        # elif self.__step < 125:action=5
+        # else:action=10
         if self.shouldAttack(state, orgState):
-            action = 10
+            # action = 10
             print("ATTACK")
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
