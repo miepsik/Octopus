@@ -81,22 +81,22 @@ class Agent:
         x = []
         y = []
         for s in files:
-            if s == "dat"+str(self.version):
+            if s == "dat" + str(self.version):
                 continue
-            f = open(mypath+s, 'r')
+            f = open(mypath + s, 'r')
             n = int(f.readline())
             inp = []
             # f.readline()
-            for i in range(n ):
+            for i in range(n):
                 inp.append(np.array([float(x) for x in f.readline().split()]))
             out = []
-            for i in range(n ):
+            for i in range(n):
                 out.append(np.array([float(x) for x in f.readline().split()]))
                 for j in range(len(out[i])):
                     if out[i][j] >= 15 - 0.01 * n - 0.05 * (n - i):
                         out[i][j] = 13 - 0.01 * n - 0.05 * (n - i)
             # f.readline()
-            for i in range(n ):
+            for i in range(n):
                 out[i][int(f.readline())] = 15 - 0.01 * n - 0.05 * (n - i)
                 x.append(inp[i])
                 y.append(out[i])
@@ -105,7 +105,7 @@ class Agent:
         self.model.fit(x, y, epochs=5, batch_size=1, verbose=1)
 
     def learnFromFile(self, file):
-        if file == "data/dat"+str(self.version):
+        if file == "data/dat" + str(self.version):
             return
         with open(file, "r") as f:
             n = int(f.readline())
@@ -151,9 +151,12 @@ class Agent:
              :2]  # lista punktów (x,y)(czubki segmentów macki)
         return np.argmin(np.square(xy - [9, -1]).sum(1)) * 2 - 1
 
-    def shouldAttack(self, state):
-        print(state[1], state[2], state[0])
-        if (state[1] < 0.08 or state[2] < 0.08) and state[0] < 1.5:
+    def shouldAttack(self, state, orgState):
+        orgState = orgState[0]
+        angle1 = angleBetweenPoints((9, -1), orgState[26:28], orgState[30:32])
+        angle2 = angleBetweenPoints((9, -1), orgState[66:68], orgState[70:72])
+        print(state[1], angle1, state[2], angle2, state[0])
+        if (state[1] + angle1 < 0.5 or state[2] + angle2 < 0.5) and state[0] < 1.25:
             return True
         return False
 
@@ -169,14 +172,14 @@ class Agent:
             l[i * 4] -= 4.5
             l[i * 4 + 1] -= 1
         return l
-        
-    def __extractUpOrLow(self,state):
-        xy = np.array(state[0,2:]).reshape(int((self.__realStateDim - 1) / 4), 4)[:,:2]
-        a = -1/9
+
+    def __extractUpOrLow(self, state):
+        xy = np.array(state[0, 2:]).reshape(int((self.__realStateDim - 1) / 4), 4)[:, :2]
+        a = -1 / 9
         b = 0
-        ul = xy[:,0]*a+b-xy[:,1]
+        ul = xy[:, 0] * a + b - xy[:, 1]
         # print(((ul<0).sum() - (ul>0).sum())>0)
-        return ((ul<0).sum() - (ul>0).sum())>0
+        return ((ul < 0).sum() - (ul > 0).sum()) > 0
 
     def getFeatureVector(self, state, reward):
         "Convert input parameters to vecture of features"
@@ -215,7 +218,7 @@ class Agent:
         "Given starting state, agent returns first action"
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.2
+        self.e = 0.15
         self.__step = 0
         self.__reward = 0
         self.previousStep = np.array([])
@@ -254,6 +257,7 @@ class Agent:
         "Given current reward and state, agent returns next action"
         state = np.array(list(state)).reshape((1, self.__realStateDim))
         self.up = self.__extractUpOrLow(state)
+        print(self.up)
         if self.__step == 0:
             self.version = int(state[0, 0] * 1000)
         if reward > 9:
@@ -269,6 +273,7 @@ class Agent:
         self.__step += 1
         self.__reward += reward
         # self.__getReward(state, reward)
+        orgState = state.copy()
         state = self.getFeatureVector(state, reward)
         # self.shouldAttack(state)
         l = np.array([state])
@@ -284,7 +289,7 @@ class Agent:
                 self.normalOut.append(values)
         else:
             action = self.previousAction
-        if self.shouldAttack(state):
+        if self.shouldAttack(state, orgState):
             action = 10
             print("ATTACK")
         if self.__step > 1:
@@ -294,7 +299,7 @@ class Agent:
             # print(newReward)
             self.previousValues[0][self.previousAction] = newReward
             self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
-            if self.__step > 150:
+            if self.__step > 230:
                 for i in range(len(self.strangeInput)):
                     x = np.array([self.strangeInput[i]])
                     y = np.array((self.normalOut[i]))
@@ -321,7 +326,7 @@ class Agent:
         pass
 
     def save(self):
-        if random.random() > 0.9:
+        if random.random() > 0.05:
             mypath = "data/"
             onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
             self.learnFromFile(mypath + onlyfiles[random.randint(0, len(onlyfiles) - 1)])
