@@ -44,11 +44,11 @@ class Agent:
         # Set up control variables
         self.alpha = 0.9
         self.g = 0.99
-        self.e = -0.2
+        self.e = -0.01
         self.__step = 0
         self.angle = np.arctan2(9, -1)
 
-        self.model = keras.models.load_model('model44')
+        self.model = keras.models.load_model('/media/miebs/Dane1/Uczelnia/semestr8/misio/octopus_arm/Octopus/model44')
         self.__reward = 0
         self.previousStep = np.array([])
         self.previousValues = np.array([])
@@ -76,7 +76,7 @@ class Agent:
     #     return np.sqrt(np.square(xy).sum(1)).mean()
 
     def learnFromAll(self):
-        mypath = "data/"
+        mypath = "/media/miebs/Dane1/Uczelnia/semestr8/misio/octopus_arm/Octopus/data/"
         files = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
         x = []
         y = []
@@ -102,10 +102,10 @@ class Agent:
                 y.append(out[i])
         x = np.array(x)
         y = np.array(y)
-        self.model.fit(x, y, epochs=55, batch_size=1, verbose=1)
+        self.model.fit(x, y, epochs=5, batch_size=1, verbose=1)
 
     def learnFromFile(self, file):
-        if file == "data/dat" + str(self.version):
+        if file == "/media/miebs/Dane1/Uczelnia/semestr8/misio/octopus_arm/Octopus/data/dat" + str(self.version):
             return
         with open(file, "r") as f:
             n = int(f.readline())
@@ -155,8 +155,7 @@ class Agent:
         orgState = orgState[0]
         angle1 = angleBetweenPoints((9, -1), orgState[26:28], orgState[30:32])
         angle2 = angleBetweenPoints((9, -1), orgState[66:68], orgState[70:72])
-        # print(state[1], angle1, state[2], angle2, state[0])
-        if (state[1] + angle1 < 0.5 or state[2] + angle2 < 0.5) and state[0] < .25:
+        if (state[0] + angle1 < 0.5 or state[1] + angle2 < 0.5) and state[2] < 1.25:
             return True
         return False
 
@@ -218,7 +217,7 @@ class Agent:
         "Given starting state, agent returns first action"
         self.alpha = 0.9
         self.g = 0.99
-        self.e = 0.1
+        self.e += 0.05
         self.__step = 0
         self.__reward = 0
         self.previousStep = np.array([])
@@ -231,6 +230,9 @@ class Agent:
         self.allInput = []
         self.allOut = []
         self.allDecision = []
+        # for i in range(50):
+        #     self.learn()
+        # self.learnFromAll()
         return self.step(0, state)
 
     def writeFile(self):
@@ -267,7 +269,7 @@ class Agent:
                 y[0, self.allDecision[i]] = 15 - 0.01 * self.__step - 0.05 * (len(self.allInput) - i)
                 # print(15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i))
                 self.model.fit(x, y, epochs=10, verbose=0)
-            self.saveData()
+            # self.saveData()
         if reward > 9:
             reward *= 3
         self.__step += 1
@@ -289,14 +291,14 @@ class Agent:
                 self.normalOut.append(values)
         else:
             action = self.previousAction
-        # if self.__step < 40:
+        # if self.__step < 50:
         #     action = 0
-        # elif self.__step < 95:
+        # elif self.__step < 115:
         #     action = 2
-        # elif self.__step < 125:action=5
+        # elif self.__step < 145:action=5
         # else:action=10
         if self.shouldAttack(state, orgState):
-            # action = 10
+            action = 10
             print("ATTACK")
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
@@ -331,14 +333,21 @@ class Agent:
         # print("DONE")
         pass
 
+    def learn(self):
+        mypath = "/media/miebs/Dane1/Uczelnia/semestr8/misio/octopus_arm/Octopus/data/"
+        onlyfiles = ['dat785', 'dat835', 'dat863', 'dat913']
+        self.learnFromFile(mypath + onlyfiles[random.randint(0, len(onlyfiles) - 1)])
+
     def save(self):
         if random.random() > 0.05:
-            mypath = "data/"
+            mypath = "/media/miebs/Dane1/Uczelnia/semestr8/misio/octopus_arm/Octopus/data/"
             onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
+            if random.random() < 0.75:
+                onlyfiles = ['dat785', 'dat835', 'dat863', 'dat913']
             self.learnFromFile(mypath + onlyfiles[random.randint(0, len(onlyfiles) - 1)])
         else:
             self.learnFromAll()
-        self.model.save("model44")
+        self.model.save("/media/miebs/Dane1/Uczelnia/semestr8/misio/octopus_arm/Octopus/model44")
 
     def cleanup(self):
         # print("DONE1")
