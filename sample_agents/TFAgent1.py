@@ -155,7 +155,7 @@ class Agent:
         orgState = orgState[0]
         angle1 = angleBetweenPoints((9, -1), orgState[26:28], orgState[30:32])
         angle2 = angleBetweenPoints((9, -1), orgState[66:68], orgState[70:72])
-        if (state[0] + angle1 < 0.5 or state[1] + angle2 < 0.5) and state[2] < 1.25:
+        if state[0] - state[1] < 0.07 and (state[0] + angle1 < 0.5 or state[1] + angle2 < 0.5) and state[2] < 1.25:
             return True
         return False
 
@@ -236,6 +236,16 @@ class Agent:
         return self.step(0, state)
 
     def writeFile(self):
+        mypath = "data/"
+        onlyfiles = [f for f in os.listdir(mypath) if os.path.isfile(os.path.join(mypath, f))]
+        ver = [int(s[3:]) for s in onlyfiles]
+        ver = [abs(self.version - x) for x in ver]
+        f1 = onlyfiles[np.argmax(ver)]
+        ff = open("data/" + str(f1), 'r')
+        y = int(ff.readline())
+        ff.close()
+        if y + 10 < self.__step:
+            return 
         with open("data/dat" + str(self.version), "w") as f:
             f.write(str(self.__step) + "\n")
             for inp in self.allInput:
@@ -269,7 +279,7 @@ class Agent:
                 y[0, self.allDecision[i]] = 15 - 0.01 * self.__step - 0.05 * (len(self.allInput) - i)
                 # print(15 - 0.01 * self.__step - 0.05*(len(self.allInput) - i))
                 self.model.fit(x, y, epochs=10, verbose=0)
-            # self.saveData()
+            self.saveData()
         if reward > 9:
             reward *= 3
         self.__step += 1
@@ -291,15 +301,19 @@ class Agent:
                 self.normalOut.append(values)
         else:
             action = self.previousAction
-        # if self.__step < 50:
-        #     action = 0
-        # elif self.__step < 115:
-        #     action = 2
-        # elif self.__step < 145:action=5
-        # else:action=10
         if self.shouldAttack(state, orgState):
             action = 10
             print("ATTACK")
+        if self.e > 0.22:
+            if self.__step < 50:
+                action = 0
+            elif self.__step < 115:
+                action = 2
+            elif self.__step < 145:
+                action = 5
+            else:
+                action = 10
+
         if self.__step > 1:
             newReward = reward + self.alpha * np.max(values)
             # if self.__step > 100:
@@ -307,7 +321,7 @@ class Agent:
             # print(newReward)
             self.previousValues[0][self.previousAction] = newReward
             self.model.fit(self.previousStep, self.previousValues, epochs=1, verbose=0)
-            if self.__step > 230:
+            if self.__step > 160:
                 for i in range(len(self.strangeInput)):
                     x = np.array([self.strangeInput[i]])
                     y = np.array((self.normalOut[i]))
